@@ -16,7 +16,7 @@ type Object struct {
 	Data  []byte
 }
 
-func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Hash) *Object {
+func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Hash) (*Object, int) {
 	if hight == 1 {
 		if (len(node.Bytes()) - seedId) <= 256*1024 {
 			h.Reset()
@@ -27,9 +27,10 @@ func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Has
 			}
 			jsonMarshal, _ := json.Marshal(blob)
 			store.Put(h.Sum(jsonMarshal), data)
-			return &blob
+			return &blob, len(data)
 		}
 		links := &Object{}
+		lenData := 0
 		for i := 1; i <= 4096; i++ {
 			h.Reset()
 			end := seedId + 256*1024
@@ -41,11 +42,12 @@ func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Has
 				Links: nil,
 				Data:  data,
 			}
+			lenData += len(data)
 			jsonMarshal, _ := json.Marshal(blob)
 			store.Put(h.Sum(jsonMarshal), data)
 			links.Links = append(links.Links, Link{
 				Hash: h.Sum(nil),
-				Size: (end - seedId + 1),
+				Size: len(data),
 			})
 			links.Data = append(links.Data, []byte("blob")...)
 			seedId += 256 * 1024
@@ -56,20 +58,22 @@ func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Has
 		jsonMarshal, _ := json.Marshal(links)
 		h.Reset()
 		store.Put(h.Sum(jsonMarshal), jsonMarshal)
-		return links
+		return links, lenData
 	} else {
 		links := &Object{}
+		lenData := 0
 		for i := 1; i <= 4096; i++ {
 			if seedId >= len(node.Bytes()) {
 				break
 			}
-			tmp := dfsForSliceFile(hight-1, node, store, seedId, h)
+			tmp, lens:= dfsForSliceFile(hight-1, node, store, seedId, h)
+			lenData += lens
 			jsonMarshal, _ := json.Marshal(tmp)
 			h.Reset()
 			links.Links = append(links.Links, Link{
 				Hash: h.Sum(jsonMarshal),
 				// 对于link 它size是什么？
-				Size: len(jsonMarshal),
+				Size: lens,
 			})
 			typeName := "link"
 			if tmp.Links == nil {
@@ -80,7 +84,7 @@ func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Has
 		h.Reset()
 		jsonMarshal, _ := json.Marshal(links)
 		store.Put(h.Sum(jsonMarshal), jsonMarshal)
-		return links
+		return links, lenData
 	}
 }
 func sliceFile(node File, store KVStore, h hash.Hash) *Object {
@@ -94,7 +98,8 @@ func sliceFile(node File, store KVStore, h hash.Hash) *Object {
 		}
 		hight++
 	}
-	return dfsForSliceFile(hight, node, store, 0, h)
+	res, _ := dfsForSliceFile(hight, node, store, 0, h)
+	return res
 }
 
 func sliceDir(node Dir, store KVStore, h hash.Hash) *Object {
@@ -109,7 +114,7 @@ func sliceDir(node Dir, store KVStore, h hash.Hash) *Object {
 			h.Reset()
 			treeObject.Links = append(treeObject.Links, Link{
 				Hash: h.Sum(jsonMarshal),
-				Size: len(jsonMarshal),
+				Size: int(file.Size()),
 				Name: file.Name(),
 			})
 			typeName := "link"
@@ -124,7 +129,7 @@ func sliceDir(node Dir, store KVStore, h hash.Hash) *Object {
 			h.Reset()
 			treeObject.Links = append(treeObject.Links, Link{
 				Hash: h.Sum(jsonMarshal),
-				Size: len(jsonMarshal),
+				Size: int(dir.Size()),
 				Name: dir.Name(),
 			})
 			typeName := "tree"
