@@ -3,6 +3,7 @@ package merkledag
 import (
 	"crypto/sha256"
 	"fmt"
+	"os"
 	"testing"
 )
 
@@ -113,7 +114,23 @@ func TestDag(t *testing.T) {
 		data: []byte("很多人在第一次看到这个东西的时侯是非常兴奋的。不过这个自动机叫作 Automaton，不是 Automation，这里的 AC 也不是 Accepted，而是 Aho–Corasick（Alfred V. Aho, Margaret J. Corasick. 1975），让萌新失望啦。切入正题。似乎在初学自动机相关的内容时，许多人难以建立对自动机的初步印象，尤其是在自学的时侯。而这篇文章就是为你们打造的。笔者在自学 AC 自动机后花费两天时间制作若干的 gif，呈现出一个相对直观的自动机形态。尽管这个图似乎不太可读，但这绝对是在作者自学的时侯，画得最认真的 gif 了。另外有些小伙伴问这个 gif 拿什么画的。笔者用 Windows 画图软件制作。"),
 	}
 	root := Add(kv, file, h)
-	fmt.Printf("%x\n",root)
+	fmt.Printf("%x\n", root)
 	// a single big file
+	kv = &HashMap{
+		mp: make(map[string][]byte),
+	}
+	h.Reset()
+	context, err := os.ReadFile("/home/xiuuix/Downloads/JetBrainsMono.zip")
+	if err != nil {
+		t.Error(err)
+	}
+
+	file = &TestFile{
+		name: "big",
+		data: context,
+	}
+
+	root = Add(kv, file, h)
+	fmt.Printf("%x\n", root)
 	// a folder
 }

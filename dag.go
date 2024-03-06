@@ -17,6 +17,7 @@ type Object struct {
 }
 
 func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Hash) (*Object, int) {
+	// fmt.Println(hight)
 	if hight == 1 {
 		if (len(node.Bytes()) - seedId) <= 256*1024 {
 			data := node.Bytes()[seedId:]
@@ -66,7 +67,7 @@ func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Has
 			if seedId >= len(node.Bytes()) {
 				break
 			}
-			tmp, lens:= dfsForSliceFile(hight-1, node, store, seedId, h)
+			tmp, lens := dfsForSliceFile(hight-1, node, store, seedId, h)
 			lenData += lens
 			jsonMarshal, _ := json.Marshal(tmp)
 			h.Write(jsonMarshal)
@@ -88,6 +89,7 @@ func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Has
 	}
 }
 func sliceFile(node File, store KVStore, h hash.Hash) *Object {
+	// fmt.Println("222222")
 	if len(node.Bytes()) <= 256*1024 {
 		data := node.Bytes()
 		blob := Object{
@@ -98,17 +100,19 @@ func sliceFile(node File, store KVStore, h hash.Hash) *Object {
 		h.Write(jsonMarshal)
 		store.Put(h.Sum(nil), data)
 		return &blob
-	} 
+	}
 	linkLen := (len(node.Bytes()) + (256*1024 - 1)) / (256 * 1024)
 	hight := 0
 	tmp := linkLen
 	for {
-		tmp = (tmp + 4095) / 4096
+		hight++
+		tmp /= 4096
+		// fmt.Println(tmp)
 		if tmp == 0 {
 			break
 		}
-		hight++
 	}
+	// fmt.Println(hight)
 	res, _ := dfsForSliceFile(hight, node, store, 0, h)
 	return res
 }
