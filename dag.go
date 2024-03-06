@@ -1,6 +1,9 @@
 package merkledag
 
-import "hash"
+import (
+	"encoding/json"
+	"hash"
+)
 
 type Link struct {
 	Name string
@@ -13,7 +16,139 @@ type Object struct {
 	Data  []byte
 }
 
+func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Hash) *Object {
+	if hight == 1 {
+		if (len(node.Bytes()) - seedId) <= 256*1024 {
+			h.Reset()
+			data := node.Bytes()[seedId:]
+			blob := Object{
+				Links: nil,
+				Data:  data,
+			}
+			jsonMarshal, _ := json.Marshal(blob)
+			store.Put(h.Sum(jsonMarshal), data)
+			return &blob
+		}
+		links := &Object{}
+		for i := 1; i <= 4096; i++ {
+			h.Reset()
+			end := seedId + 256*1024
+			if len(node.Bytes()) < end {
+				end = len(node.Bytes())
+			}
+			data := node.Bytes()[seedId:end]
+			blob := Object{
+				Links: nil,
+				Data:  data,
+			}
+			jsonMarshal, _ := json.Marshal(blob)
+			store.Put(h.Sum(jsonMarshal), data)
+			links.Links = append(links.Links, Link{
+				Hash: h.Sum(nil),
+				Size: (end - seedId + 1),
+			})
+			links.Data = append(links.Data, []byte("blob")...)
+			seedId += 256 * 1024
+			if seedId >= len(node.Bytes()) {
+				break
+			}
+		}
+		jsonMarshal, _ := json.Marshal(links)
+		h.Reset()
+		store.Put(h.Sum(jsonMarshal), jsonMarshal)
+		return links
+	} else {
+		links := &Object{}
+		for i := 1; i <= 4096; i++ {
+			if seedId >= len(node.Bytes()) {
+				break
+			}
+			tmp := dfsForSliceFile(hight-1, node, store, seedId, h)
+			jsonMarshal, _ := json.Marshal(tmp)
+			h.Reset()
+			links.Links = append(links.Links, Link{
+				Hash: h.Sum(jsonMarshal),
+				// 对于link 它size是什么？
+				Size: len(jsonMarshal),
+			})
+			typeName := "link"
+			if tmp.Links == nil {
+				typeName = "blob"
+			}
+			links.Data = append(links.Data, []byte(typeName)...)
+		}
+		h.Reset()
+		jsonMarshal, _ := json.Marshal(links)
+		store.Put(h.Sum(jsonMarshal), jsonMarshal)
+		return links
+	}
+}
+func sliceFile(node File, store KVStore, h hash.Hash) *Object {
+	linkLen := (len(node.Bytes()) + (256*1024 - 1)) / (256 * 1024)
+	hight := 0
+	tmp := linkLen
+	for {
+		tmp = (tmp + 4095) / 4096
+		if tmp == 0 {
+			break
+		}
+		hight++
+	}
+	return dfsForSliceFile(hight, node, store, 0, h)
+}
+
+func sliceDir(node Dir, store KVStore, h hash.Hash) *Object {
+	iter := node.It()
+	treeObject := &Object{}
+	for iter.Next() {
+		node := iter.Node()
+		if node.Type() == FILE {
+			file := node.(File)
+			tmp := sliceFile(file, store, h)
+			jsonMarshal, _ := json.Marshal(tmp)
+			h.Reset()
+			treeObject.Links = append(treeObject.Links, Link{
+				Hash: h.Sum(jsonMarshal),
+				Size: len(jsonMarshal),
+				Name: file.Name(),
+			})
+			typeName := "link"
+			if tmp.Links == nil {
+				typeName = "blob"
+			}
+			treeObject.Data = append(treeObject.Data, []byte(typeName)...)
+		} else {
+			dir := node.(Dir)
+			tmp := sliceDir(dir, store, h)
+			jsonMarshal, _ := json.Marshal(tmp)
+			h.Reset()
+			treeObject.Links = append(treeObject.Links, Link{
+				Hash: h.Sum(jsonMarshal),
+				Size: len(jsonMarshal),
+				Name: dir.Name(),
+			})
+			typeName := "tree"
+			treeObject.Data = append(treeObject.Data, []byte(typeName)...)
+		}
+	}
+	jsonMarshal, _ := json.Marshal(treeObject)
+	h.Reset()
+	store.Put(h.Sum(jsonMarshal), jsonMarshal)
+	return treeObject
+}
 func Add(store KVStore, node Node, h hash.Hash) []byte {
 	// TODO 将分片写入到KVStore中，并返回Merkle Root
-	return nil
+	if node.Type() == FILE {
+		file := node.(File)
+		tmp := sliceFile(file, store, h)
+		jsonMarshal, _ := json.Marshal(tmp)
+		h.Reset()
+		return h.Sum(jsonMarshal)
+	} else {
+		dir := node.(Dir)
+		tmp := sliceDir(dir, store, h)
+		jsonMarshal, _ := json.Marshal(tmp)
+		h.Reset()
+		return h.Sum(jsonMarshal)
+	}
 }
