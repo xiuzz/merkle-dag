@@ -138,7 +138,7 @@ func TestDag(t *testing.T) {
 		mp: make(map[string][]byte),
 	}
 	h.Reset()
-	path := "/home/xiuuix/Documents"
+	path := "/home/xiuuix/code"
 	files, _ := ioutil.ReadDir(path)
 	dir := &TestDir{
 		list: make([]Node, len(files)),
@@ -180,7 +180,10 @@ func search(path string) *TestDir {
 		} else {
 			context, err := os.ReadFile(newPath)
 			if err != nil {
-				panic(err)
+				context := search(newPath)
+				context.name = fi.Name()
+				dir.list[i] = context
+				continue
 			}
 			file := &TestFile{
 				name: fi.Name(),
