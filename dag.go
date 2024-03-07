@@ -18,6 +18,9 @@ type Object struct {
 
 func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Hash) (*Object, int) {
 	// fmt.Println(hight)
+	// if hight < 1 {
+	// 	panic("invade!")
+	// }
 	if hight == 1 {
 		if (len(node.Bytes()) - seedId) <= 256*1024 {
 			data := node.Bytes()[seedId:]

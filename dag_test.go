@@ -3,6 +3,7 @@ package merkledag
 import (
 	"crypto/sha256"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -133,4 +134,60 @@ func TestDag(t *testing.T) {
 	root = Add(kv, file, h)
 	fmt.Printf("%x\n", root)
 	// a folder
+	kv = &HashMap{
+		mp: make(map[string][]byte),
+	}
+	h.Reset()
+	path := "/home/xiuuix/Documents"
+	files, _ := ioutil.ReadDir(path)
+	dir := &TestDir{
+		list: make([]Node, len(files)),
+		name: "Documents",
+	}
+	for i, fi := range files {
+		newPath := path + "/" + fi.Name()
+		if fi.IsDir() {
+			context := search(newPath)
+			context.name = fi.Name()
+			dir.list[i] = context
+		} else {
+			context, err := os.ReadFile(newPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			file = &TestFile{
+				name: fi.Name(),
+				data: context,
+			}
+			dir.list[i] = file
+		}
+	}
+	root = Add(kv, dir, h)
+	fmt.Printf("%x\n", root)
+}
+
+func search(path string) *TestDir {
+	files, _ := ioutil.ReadDir(path)
+	dir := &TestDir{
+		list: make([]Node, len(files)),
+	}
+	for i, fi := range files {
+		newPath := path + "/" + fi.Name()
+		if fi.IsDir() {
+			context := search(newPath)
+			context.name = fi.Name()
+			dir.list[i] = context
+		} else {
+			context, err := os.ReadFile(newPath)
+			if err != nil {
+				panic(err)
+			}
+			file := &TestFile{
+				name: fi.Name(),
+				data: context,
+			}
+			dir.list[i] = file
+		}
+	}
+	return dir
 }
