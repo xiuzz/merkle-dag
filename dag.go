@@ -5,6 +5,7 @@ import (
 	"hash"
 )
 
+const LIMIT = 4096
 type Link struct {
 	Name string
 	Hash []byte
@@ -39,7 +40,7 @@ func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Has
 		}
 		links := &Object{}
 		lenData := 0
-		for i := 1; i <= 4096; i++ {
+		for i := 1; i <= LIMIT; i++ {
 			end := seedId + 256*1024
 			if len(node.Bytes()) < end {
 				end = len(node.Bytes())
@@ -78,7 +79,7 @@ func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Has
 	} else {
 		links := &Object{}
 		lenData := 0
-		for i := 1; i <= 4096; i++ {
+		for i := 1; i <= LIMIT; i++ {
 			if seedId >= len(node.Bytes()) {
 				break
 			}
@@ -130,7 +131,7 @@ func sliceFile(node File, store KVStore, h hash.Hash) *Object {
 	tmp := linkLen
 	for {
 		hight++
-		tmp /= 4096
+		tmp /= LIMIT
 		// fmt.Println(tmp)
 		if tmp == 0 {
 			break
