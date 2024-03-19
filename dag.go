@@ -15,6 +15,7 @@ type Link struct {
 type Object struct {
 	Links []Link
 	Data  []byte
+	// tree link blob
 }
 
 func dfsForSliceFile(hight int, node File, store KVStore, seedId int, h hash.Hash) (*Object, int) {
