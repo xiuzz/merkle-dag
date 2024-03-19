@@ -13,9 +13,6 @@ func TestDag2file(t *testing.T) {
 	}
 	// fmt.Println(len(ans))
 	for i := 0; i < len(ans); i++ {
-		fmt.Println(ans[i])
+		fmt.Printf("%x\n", ans[i])
 	}
 }
-
-
-
