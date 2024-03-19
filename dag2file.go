@@ -22,8 +22,8 @@ func Hash2File(store KVStore, hash []byte, path string, hp HashPool) []byte {
 		}
 		index := 0
 		for i := range obj.Links {
-			objType := string(obj.Data[index:index+8])
-			index += 8
+			objType := string(obj.Data[index:index+4])
+			index += 4
 			objInfo := obj.Links[i]
 			if objType == "tree" {
 				objDirBinary, _ := store.Get(objInfo.Hash)
@@ -54,8 +54,8 @@ func getFileByLink(obj Object, store KVStore) []byte {
 	ans := make([]byte, 0)
 	index := 0
 	for i := range obj.Links {
-		curObjType := string(obj.Data[index:index+8])
-		index += 8
+		curObjType := string(obj.Data[index:index+4])
+		index += 4
 		curObjLink := obj.Links[i]
 		curObjBinary, _ := store.Get(curObjLink.Hash)
 		var curObj Object
@@ -76,8 +76,8 @@ func getFileByDir(obj Object, pathArr []string, cur int, store KVStore) []byte {
 	}
 	index := 0
 	for i := range obj.Links {
-		objType := string(obj.Data[index:index+8])
-		index += 8
+		objType := string(obj.Data[index:index+4])
+		index += 4
 		objInfo := obj.Links[i]
 		if objType == "tree" {
 			objDirBinary, _ := store.Get(objInfo.Hash)
