@@ -27,59 +27,93 @@ type Object struct {
 	Data  []byte
 }
 
+func (obj *Object) appendActionAsTree(key []byte, length int, childObjName string, childObjType string) {
+	obj.Links = append(obj.Links, Link{
+		Hash: key,
+		Size: length,
+		Name: childObjName,
+	})
+	obj.Data = append(obj.Data, []byte(childObjType)...)
+}
+
+func (obj *Object) appendActionAsList(key []byte, length int, childObjType string) {
+	obj.appendActionAsTree(key, length, "", childObjType)
+}
+
 func Add(store KVStore, node Node, h hash.Hash) []byte {
 	// TODO 将分片写入到KVStore中，并返回Merkle Root
 	switch node.Type() {
 	case FILE:
 		file := node.(File)
-		tmp := sliceFile(file, store, h)
-		jsonMarshal, _ := json.Marshal(tmp)
-		h.Reset()
-		h.Write(jsonMarshal)
-		return h.Sum(nil)
+		root := sliceFile(file, store, h)
+		return getKey(root, h)
 	case DIR:
 		dir := node.(Dir)
-		tmp := sliceDir(dir, store, h)
-		jsonMarshal, _ := json.Marshal(tmp)
-		h.Reset()
-		h.Write(jsonMarshal)
-		return h.Sum(nil)
+		root := sliceDir(dir, store, h)
+		return getKey(root, h)
 	}
 	return nil
 }
 
-func saveObject(obj *Object, h hash.Hash, store KVStore, objType string) {
+func getKey(obj *Object, h hash.Hash) []byte {
+	key, _ := getKeyAndValue(obj, h)
+	return key
+}
+
+func getKeyAndValue(obj *Object, h hash.Hash) ([]byte, []byte) {
 	jsonMarshal, _ := json.Marshal(obj)
 	h.Reset()
 	h.Write(jsonMarshal)
-	flag, _ := store.Has(h.Sum(nil))
+	return h.Sum(nil), jsonMarshal
+}
+
+func put(store KVStore, key []byte, value []byte, objType string) {
+	if objType != TREE && len(value) > BLOCK_LIMIT {
+		panic("block over the limit")
+	}
+	store.Put(key, value)
+}
+
+func saveObject(obj *Object, h hash.Hash, store KVStore, objType string) {
+	key, value := getKeyAndValue(obj, h)
+	flag, _ := store.Has(key)
 	if !flag {
-		if objType == BLOB {
-			store.Put(h.Sum(nil), obj.Data)
-			if len(obj.Data) > BLOCK_LIMIT {
-				panic("block over the limit")
-			}
-		} else {
-			store.Put(h.Sum(nil), jsonMarshal)
-			if len(jsonMarshal) > BLOCK_LIMIT && objType == LIST {
-				panic("block over the limit")
-			}
-		}
+		put(store, key, value, objType)
 	}
 }
 
+func saveBlob(blob *Object, h hash.Hash, store KVStore) {
+	key := getKey(blob, h)
+	flag, _ := store.Has(key)
+	if !flag {
+		put(store, key, blob.Data, BLOB)
+	}
+}
+
+func newBlob(data []byte, h hash.Hash, store KVStore) *Object {
+	blob := &Object{
+		Links: nil,
+		Data: data,
+	}
+	saveBlob(blob, h, store)
+	return blob
+}
+
+func checkObjIsBlobOrList(obj *Object) string {
+	res := LIST
+	if obj.Links == nil {
+		res = BLOB
+	}
+	return res
+}
 func sliceFile(node File, store KVStore, h hash.Hash) *Object {
-	if len(node.Bytes()) <= BLOCK_LIMIT {
-		data := node.Bytes()
-		blob := Object{
-			Links: nil,
-			Data:  data,
-		}
-		saveObject(&blob, h, store, BLOB)
-		return &blob
+	nodeData := node.Bytes()
+	nodeLen := len(nodeData)
+	if nodeLen <= BLOCK_LIMIT {
+		return newBlob(nodeData, h, store)
 	}
 	//list
-	linkLen := (len(node.Bytes()) + (BLOCK_LIMIT - 1)) / BLOCK_LIMIT
+	linkLen := (nodeLen + (BLOCK_LIMIT - 1)) / BLOCK_LIMIT
 	hight := 0
 	tmp := linkLen
 	for {
@@ -103,18 +137,9 @@ func dfsForSliceList(hight int, node File, store KVStore, seedId *int, h hash.Ha
 		for i := 1; i <= LIST_LIMIT && *seedId < len(node.Bytes()); i++ {
 			tmp, lens := dfsForSliceList(hight-1, node, store, seedId, h)
 			lenData += lens
-			jsonMarshal, _ := json.Marshal(tmp)
-			h.Reset()
-			h.Write(jsonMarshal)
-			list.Links = append(list.Links, Link{
-				Hash: h.Sum(nil),
-				Size: lens,
-			})
-			typeName := LIST
-			if tmp.Links == nil {
-				typeName = BLOB
-			}
-			list.Data = append(list.Data, []byte(typeName)...)
+			key := getKey(tmp, h)
+			typeName := checkObjIsBlobOrList(tmp)
+			list.appendActionAsList(key, lens, typeName)
 		}
 		saveObject(list, h, store, LIST)
 		return list, lenData
@@ -123,35 +148,27 @@ func dfsForSliceList(hight int, node File, store KVStore, seedId *int, h hash.Ha
 
 func unionBlob(node File, store KVStore, seedId *int, h hash.Hash) (*Object, int) {
 	// only 1 blob
-	if (len(node.Bytes()) - *seedId) <= BLOCK_LIMIT {
-		data := node.Bytes()[*seedId:]
-		blob := Object{
-			Links: nil,
-			Data:  data,
-		}
-		saveObject(&blob, h, store, BLOB)
-		return &blob, len(data)
+	nodeData := node.Bytes()
+	nodeLen := len(nodeData)
+	if (nodeLen - *seedId) <= BLOCK_LIMIT {
+		data := nodeData[*seedId:]
+		return newBlob(data, h, store), len(data)
 	}
 	// > 1 blob
 	list := &Object{}
 	lenData := 0
-	for i := 1; i <= LIST_LIMIT && *seedId < len(node.Bytes()); i++ {
+	for i := 1; i <= LIST_LIMIT && *seedId < nodeLen; i++ {
 		end := *seedId + BLOCK_LIMIT
-		if len(node.Bytes()) < end {
-			end = len(node.Bytes())
+		if nodeLen < end {
+			end = nodeLen
 		}
-		data := node.Bytes()[*seedId:end]
-		blob := Object{
-			Links: nil,
-			Data:  data,
-		}
-		lenData += len(data)
-		saveObject(&blob, h, store, BLOB)
-		list.Links = append(list.Links, Link{
-			Hash: h.Sum(nil),
-			Size: len(data),
-		})
-		list.Data = append(list.Data, []byte(BLOB)...)
+		data := nodeData[*seedId:end]
+		blob := newBlob(data, h ,store)
+		lenBlob := len(data)
+		lenData += lenBlob
+		key := getKey(blob, h)
+		saveBlob(blob, h, store)
+		list.appendActionAsList(key, lenBlob, BLOB)
 		*seedId += BLOCK_LIMIT
 	}
 	saveObject(list, h, store, LIST)
@@ -167,32 +184,16 @@ func sliceDir(node Dir, store KVStore, h hash.Hash) *Object {
 		case FILE:
 			file := node.(File)
 			tmp := sliceFile(file, store, h)
-			jsonMarshal, _ := json.Marshal(tmp)
-			h.Reset()
-			h.Write(jsonMarshal)
-			treeObject.Links = append(treeObject.Links, Link{
-				Hash: h.Sum(nil),
-				Size: int(file.Size()),
-				Name: file.Name(),
-			})
-			typeName := LIST
-			if tmp.Links == nil {
-				typeName = BLOB
-			}
-			treeObject.Data = append(treeObject.Data, []byte(typeName)...)
+			key := getKey(tmp, h)
+			typeName := checkObjIsBlobOrList(tmp)
+			treeObject.appendActionAsTree(key, int(file.Size()), file.Name(), typeName)
+
 		case DIR:
 			dir := node.(Dir)
 			tmp := sliceDir(dir, store, h)
-			jsonMarshal, _ := json.Marshal(tmp)
-			h.Reset()
-			h.Write(jsonMarshal)
-			treeObject.Links = append(treeObject.Links, Link{
-				Hash: h.Sum(nil),
-				Size: int(dir.Size()),
-				Name: dir.Name(),
-			})
+			key := getKey(tmp, h)
 			typeName := TREE
-			treeObject.Data = append(treeObject.Data, []byte(typeName)...)
+			treeObject.appendActionAsTree(key, int(dir.Size()), dir.Name(), typeName)
 		}
 	}
 	saveObject(treeObject, h, store, TREE)
