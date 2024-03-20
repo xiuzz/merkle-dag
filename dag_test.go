@@ -121,7 +121,7 @@ func TestDag(t *testing.T) {
 		mp: make(map[string][]byte),
 	}
 	h.Reset()
-	context, err := os.ReadFile("/home/xiuuix/Downloads/Mario Kart 8 Deluxe [0100152000022800][v786432].nsp")
+	context, err := os.ReadFile("/home/xiuuix/Downloads/JetBrainsMono.zip")
 	if err != nil {
 		t.Error(err)
 	}
@@ -138,11 +138,11 @@ func TestDag(t *testing.T) {
 		mp: make(map[string][]byte),
 	}
 	h.Reset()
-	path := "/home/xiuuix/code"
+	path := "/home/xiuuix/go"
 	files, _ := ioutil.ReadDir(path)
 	dir := &TestDir{
 		list: make([]Node, len(files)),
-		name: "Documents",
+		name: "/",
 	}
 	for i, fi := range files {
 		newPath := path + "/" + fi.Name()

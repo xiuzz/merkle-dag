@@ -2,7 +2,6 @@ package merkledag
 
 import (
 	"encoding/json"
-	"fmt"
 	"hash"
 )
 
@@ -35,12 +34,14 @@ func Add(store KVStore, node Node, h hash.Hash) []byte {
 		file := node.(File)
 		tmp := sliceFile(file, store, h)
 		jsonMarshal, _ := json.Marshal(tmp)
+		h.Reset()
 		h.Write(jsonMarshal)
 		return h.Sum(nil)
 	case DIR:
 		dir := node.(Dir)
 		tmp := sliceDir(dir, store, h)
 		jsonMarshal, _ := json.Marshal(tmp)
+		h.Reset()
 		h.Write(jsonMarshal)
 		return h.Sum(nil)
 	}
@@ -158,7 +159,7 @@ func unionBlob(node File, store KVStore, seedId *int, h hash.Hash) (*Object, int
 		*seedId += BLOCK_LIMIT
 	}
 	jsonMarshal, _ := json.Marshal(list)
-	fmt.Println(node.Name(), len(jsonMarshal) / 1024)
+	// fmt.Println(node.Name(), len(jsonMarshal) / 1024)
 	h.Reset()
 	h.Write(jsonMarshal)
 	flag, _ := store.Has(h.Sum(nil))
