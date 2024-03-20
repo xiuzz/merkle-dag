@@ -89,17 +89,18 @@ func sliceFile(node File, store KVStore, h hash.Hash) *Object {
 			break
 		}
 	}
-	res, _ := dfsForSliceList(hight, node, store, 0, h)
+	seedId := 0
+	res, _ := dfsForSliceList(hight, node, store, &seedId, h)
 	return res
 }
 
-func dfsForSliceList(hight int, node File, store KVStore, seedId int, h hash.Hash) (*Object, int) {
+func dfsForSliceList(hight int, node File, store KVStore, seedId *int, h hash.Hash) (*Object, int) {
 	if hight == 1 {
 		return unionBlob(node, store, seedId, h)
 	} else { // > 1 depth list
 		list := &Object{}
 		lenData := 0
-		for i := 1; i <= LIST_LIMIT && seedId < len(node.Bytes()); i++ {
+		for i := 1; i <= LIST_LIMIT && *seedId < len(node.Bytes()); i++ {
 			tmp, lens := dfsForSliceList(hight-1, node, store, seedId, h)
 			lenData += lens
 			jsonMarshal, _ := json.Marshal(tmp)
@@ -120,10 +121,10 @@ func dfsForSliceList(hight int, node File, store KVStore, seedId int, h hash.Has
 	}
 }
 
-func unionBlob(node File, store KVStore, seedId int, h hash.Hash) (*Object, int) {
+func unionBlob(node File, store KVStore, seedId *int, h hash.Hash) (*Object, int) {
 	// only 1 blob
-	if (len(node.Bytes()) - seedId) <= BLOCK_LIMIT {
-		data := node.Bytes()[seedId:]
+	if (len(node.Bytes()) - *seedId) <= BLOCK_LIMIT {
+		data := node.Bytes()[*seedId:]
 		blob := Object{
 			Links: nil,
 			Data:  data,
@@ -134,12 +135,12 @@ func unionBlob(node File, store KVStore, seedId int, h hash.Hash) (*Object, int)
 	// > 1 blob
 	list := &Object{}
 	lenData := 0
-	for i := 1; i <= LIST_LIMIT && seedId < len(node.Bytes()); i++ {
-		end := seedId + BLOCK_LIMIT
+	for i := 1; i <= LIST_LIMIT && *seedId < len(node.Bytes()); i++ {
+		end := *seedId + BLOCK_LIMIT
 		if len(node.Bytes()) < end {
 			end = len(node.Bytes())
 		}
-		data := node.Bytes()[seedId:end]
+		data := node.Bytes()[*seedId:end]
 		blob := Object{
 			Links: nil,
 			Data:  data,
@@ -151,7 +152,7 @@ func unionBlob(node File, store KVStore, seedId int, h hash.Hash) (*Object, int)
 			Size: len(data),
 		})
 		list.Data = append(list.Data, []byte(BLOB)...)
-		seedId += BLOCK_LIMIT
+		*seedId += BLOCK_LIMIT
 	}
 	saveObject(list, h, store, LIST)
 	return list, lenData
