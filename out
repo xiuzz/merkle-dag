@@ -39,4 +39,4 @@ func newBuffer(extra uintptr) buffer {
 [136 240 118 254 7 34 188 0 154 126 77 254 245 8 194 220 155 167 151 38 134 223 16 116 242 236 14 245 210 135 92 235]
 true
 PASS
-ok  	merkle-dag	3.707s
+ok  	merkle-dag	5.282s

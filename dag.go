@@ -167,7 +167,6 @@ func unionBlob(node File, store KVStore, seedId *int, h hash.Hash) (*Object, int
 		lenBlob := len(data)
 		lenData += lenBlob
 		key := getKey(blob, h)
-		saveBlob(blob, h, store)
 		list.appendActionAsList(key, lenBlob, BLOB)
 		*seedId += BLOCK_LIMIT
 	}
