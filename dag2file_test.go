@@ -45,5 +45,7 @@ func TestDag2file(t *testing.T) {
 	root := Add(kv, dir, h)
 	fmt.Printf("%x\n", root)
 	buffer_go := Hash2File(kv, root, "/pkg/mod/bazil.org/fuse@v0.0.0-20200117225306-7b5117fecadc/buffer.go", nil)
+	fuse_go := Hash2File(kv, root, "/pkg/mod/bazil.org/fuse@v0.0.0-20200117225306-7b5117fecadc/fuse.go", nil)
 	fmt.Println(string(buffer_go))
+	fmt.Println(string(fuse_go))
 }
