@@ -121,7 +121,7 @@ func TestDag(t *testing.T) {
 		mp: make(map[string][]byte),
 	}
 	h.Reset()
-	context, err := os.ReadFile("/home/xiuuix/Downloads/JetBrainsMono.zip")
+	context, err := os.ReadFile("/home/xiuuix/Downloads/Mario Kart 8 Deluxe [0100152000022800][v786432].nsp")
 	if err != nil {
 		t.Error(err)
 	}
