@@ -28,9 +28,12 @@ func getFileByDir(obj Object, pathArr []string, cur int, store KVStore) []byte {
 	}
 	index := 0
 	for i := range obj.Links {
-		objType := string(obj.Data[index:index+4])
+		objType := string(obj.Data[index : index+4])
 		index += 4
 		objInfo := obj.Links[i]
+		if objInfo.Name != pathArr[cur] {
+			continue
+		}
 		switch objType {
 		case TREE:
 			objDirBinary, _ := store.Get(objInfo.Hash)
@@ -41,18 +44,14 @@ func getFileByDir(obj Object, pathArr []string, cur int, store KVStore) []byte {
 				return ans
 			}
 		case BLOB:
-			if objInfo.Name == pathArr[cur] {
-				ans, _ := store.Get(objInfo.Hash)
-				return ans
-			}
+			ans, _ := store.Get(objInfo.Hash)
+			return ans
 		case LIST:
-			if objInfo.Name == pathArr[cur] {
-				objLinkBinary, _ := store.Get(objInfo.Hash)
-				var objLink Object
-				json.Unmarshal(objLinkBinary, &objLink)
-				ans := getFileByList(objLink, store)
-				return ans
-			}
+			objLinkBinary, _ := store.Get(objInfo.Hash)
+			var objLink Object
+			json.Unmarshal(objLinkBinary, &objLink)
+			ans := getFileByList(objLink, store)
+			return ans
 		}
 	}
 	return nil
@@ -62,7 +61,7 @@ func getFileByList(obj Object, store KVStore) []byte {
 	ans := make([]byte, 0)
 	index := 0
 	for i := range obj.Links {
-		curObjType := string(obj.Data[index:index+4])
+		curObjType := string(obj.Data[index : index+4])
 		index += 4
 		curObjLink := obj.Links[i]
 		curObjBinary, _ := store.Get(curObjLink.Hash)
@@ -70,7 +69,7 @@ func getFileByList(obj Object, store KVStore) []byte {
 		json.Unmarshal(curObjBinary, &curObj)
 		if curObjType == BLOB {
 			ans = append(ans, curObjBinary...)
-		} else { //List 
+		} else { //List
 			tmp := getFileByList(curObj, store)
 			ans = append(ans, tmp...)
 		}

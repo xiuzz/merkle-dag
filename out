@@ -36,4 +36,4 @@ func newBuffer(extra uintptr) buffer {
 }
 
 PASS
-ok  	merkle-dag	2.935s
+ok  	merkle-dag	2.850s
